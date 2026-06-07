@@ -6,7 +6,7 @@
 
 **Architecture:** Put all rendering, timing, validation, and video-export behavior in one new public function, `animate_cable_joint.m`, with focused local helper functions. Add a separate animation test class. Modify `main_run.m` only to define visualization options and call the new function; do not modify existing computational functions or `plot_results.m`.
 
-**Tech Stack:** MATLAB graphics (`figure`, `surf`, `plot3`, `scatter3`), `VideoWriter`, optional `ffmpeg`/`libx264` fallback, `matlab.unittest`.
+**Tech Stack:** MATLAB graphics (`figure`, `surf`, `plot3`, `scatter3`), `VideoWriter`, optional `ffmpeg` MPEG-4 Part 2 fallback, `matlab.unittest`.
 
 **Repository note:** `/home/lyx/cable joint` is not currently a Git worktree. The normal per-task commit steps are replaced by explicit verification checkpoints. Do not initialize Git as part of this feature.
 
@@ -618,7 +618,9 @@ Do not remove duplicate indices. Repeating a nearest simulation frame is require
 
 Before the loop, prefer the native `"MPEG-4"` profile. If it is unavailable,
 create a temporary `"Motion JPEG AVI"` writer and require `ffmpeg` on `PATH`.
-Protect both the writer and temporary file with `onCleanup`.
+Create the temporary-file `onCleanup` before calling `open(videoWriter)`, then
+create the writer cleanup after a successful open. This guarantees cleanup when
+opening the temporary AVI itself fails.
 
 ```matlab
     videoWriter = [];
@@ -652,8 +654,9 @@ end
 ```
 
 After the loop, explicitly clear the writer cleanup so the file is finalized.
-For the fallback path, transcode with `libx264` and `-pix_fmt yuv420p`, then
-delete the temporary AVI:
+For the fallback path, transcode with `-c:v mpeg4 -q:v 3 -pix_fmt yuv420p`,
+then delete the temporary AVI. This format is readable by MATLAB
+`VideoReader` on the target R2025a/Linux installation:
 
 ```matlab
     if options.ExportVideo
@@ -670,7 +673,7 @@ Only pace frames when `RealtimePlayback=true` and `ExportVideo=false`:
     playbackStartTime = time(1);
 ```
 
-At the end of each interactive frame:
+Before updating each interactive frame:
 
 ```matlab
     if options.RealtimePlayback && ~options.ExportVideo

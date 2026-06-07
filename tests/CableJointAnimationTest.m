@@ -237,14 +237,12 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
         function testExportsNonemptyMp4WithTrajectoryDuration(testCase)
             [fixedPoints, movingPoints] = ...
                 CableJointAnimationTest.platformGeometry();
-            time = 0:0.02:0.1;
-            qTrajectory = [ ...
-                linspace(0, deg2rad(2), numel(time)); ...
-                linspace(0, deg2rad(-1), numel(time)); ...
-                linspace(39, 42, numel(time))];
+            time = [0, 0.1];
+            qTrajectory = [0, deg2rad(8); 0, deg2rad(-6); 39, 55];
             videoFile = string(tempname) + ".mp4";
             testCase.addTeardown( ...
                 @() CableJointAnimationTest.deleteFileIfPresent(videoFile));
+            aviFilesBefore = CableJointAnimationTest.listTemporaryAviFiles();
 
             animate_cable_joint( ...
                 time, qTrajectory, fixedPoints, movingPoints, ...
@@ -254,11 +252,19 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
             videoInfo = dir(videoFile);
             testCase.assertTrue(isfile(videoFile));
             testCase.verifyGreaterThan(videoInfo.bytes, 0);
-            videoDuration = ...
-                CableJointAnimationTest.readVideoDuration(videoFile);
-            if ~isempty(videoDuration)
-                testCase.verifyEqual(videoDuration, 0.1, AbsTol=0.08);
+            reader = VideoReader(videoFile);
+            testCase.verifyEqual(reader.FrameRate, 30, AbsTol=0.1);
+            testCase.verifyEqual(reader.Duration, 0.1, AbsTol=0.04);
+            testCase.verifyEqual(reader.NumFrames, 3);
+            firstFrame = readFrame(reader);
+            lastFrame = firstFrame;
+            while hasFrame(reader)
+                lastFrame = readFrame(reader);
             end
+            testCase.verifyNotEqual(firstFrame, lastFrame);
+            testCase.verifyEqual( ...
+                CableJointAnimationTest.listTemporaryAviFiles(), ...
+                aviFilesBefore);
         end
 
         function testRealtimePlaybackTracksSimulationTime(testCase)
@@ -282,6 +288,98 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
 
             testCase.verifyGreaterThanOrEqual(elapsed, 0.08);
             testCase.verifyLessThan(elapsed, 1);
+        end
+
+        function testRealtimePlaybackWaitsBeforeRenderingNextFrame(testCase)
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            time = [0, 0.15, 0.30];
+            qTrajectory = [zeros(2, numel(time)); 39, 45, 51];
+            appdataKey = "CableJointObservedPose_" + ...
+                replace(string(java.util.UUID.randomUUID), "-", "_");
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.removeRootAppdata(appdataKey));
+            observationTimer = timer( ...
+                StartDelay=0.07, ...
+                TimerFcn=@(timerHandle, ~) ...
+                    CableJointAnimationTest.capturePoseStatus( ...
+                        timerHandle, appdataKey));
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteTimer(observationTimer));
+            originalTextCreateFcn = get(groot, "defaultTextCreateFcn");
+            set(groot, "defaultTextCreateFcn", ...
+                @(textHandle, ~) ...
+                    CableJointAnimationTest.startPoseTimer( ...
+                        textHandle, observationTimer));
+            testCase.addTeardown(@() set( ...
+                groot, "defaultTextCreateFcn", originalTextCreateFcn));
+
+            animate_cable_joint( ...
+                time, qTrajectory, fixedPoints, movingPoints, ...
+                160, 80, ExportVideo=false, ...
+                RealtimePlayback=true, Visible="on");
+
+            if ~isappdata(groot, appdataKey) && ...
+                    strcmp(observationTimer.Running, "on")
+                wait(observationTimer);
+            end
+            testCase.assertTrue(isappdata(groot, appdataKey));
+            observedStatus = getappdata(groot, appdataKey);
+            testCase.verifyThat(observedStatus, ...
+                matlab.unittest.constraints.ContainsSubstring("t = 0.000"));
+        end
+
+        function testReportsUnavailableMp4EncoderWithoutFfmpeg(testCase)
+            testCase.assumeFalse( ...
+                CableJointAnimationTest.hasNativeMpeg4Profile());
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            emptyPath = string(tempname);
+            mkdir(emptyPath);
+            testCase.addTeardown(@() rmdir(emptyPath, "s"));
+            pathCleanup = CableJointAnimationTest.useTemporaryPath(emptyPath);
+            videoFile = string(tempname) + ".mp4";
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteFileIfPresent(videoFile));
+
+            testCase.verifyError(@() animate_cable_joint( ...
+                [0, 0.1], [0, 0; 0, 0; 39, 40], ...
+                fixedPoints, movingPoints, 160, 80, ...
+                ExportVideo=true, VideoFile=videoFile, ...
+                RealtimePlayback=false, Visible="on"), ...
+                "CableJointAnimation:Mp4EncoderUnavailable");
+
+            delete(pathCleanup);
+            testCase.verifyFalse(isfile(videoFile));
+        end
+
+        function testCleansFallbackFilesWhenMp4EncodingFails(testCase)
+            testCase.assumeFalse( ...
+                CableJointAnimationTest.hasNativeMpeg4Profile());
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            fakeBin = string(tempname);
+            mkdir(fakeBin);
+            testCase.addTeardown(@() rmdir(fakeBin, "s"));
+            CableJointAnimationTest.createFailingFfmpeg(fakeBin);
+            pathCleanup = CableJointAnimationTest.useTemporaryPath(fakeBin);
+            videoFile = string(tempname) + ".mp4";
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteFileIfPresent(videoFile));
+            aviFilesBefore = CableJointAnimationTest.listTemporaryAviFiles();
+
+            testCase.verifyError(@() animate_cable_joint( ...
+                [0, 0.1], [0, 0; 0, 0; 39, 40], ...
+                fixedPoints, movingPoints, 160, 80, ...
+                ExportVideo=true, VideoFile=videoFile, ...
+                VideoFrameRate=30, RealtimePlayback=false, Visible="on"), ...
+                "CableJointAnimation:Mp4EncodingFailed");
+
+            delete(pathCleanup);
+            testCase.verifyFalse(isfile(videoFile));
+            testCase.verifyEqual( ...
+                CableJointAnimationTest.listTemporaryAviFiles(), ...
+                aviFilesBefore);
         end
 
         function testClosingWindowStopsRealtimePlaybackSafely(testCase)
@@ -354,20 +452,67 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
             end
         end
 
-        function duration = readVideoDuration(videoFile)
-            duration = [];
-            if exist("VideoReader", "class") ~= 8
-                return;
-            end
-            try
-                reader = VideoReader(videoFile);
-                duration = reader.Duration;
-            catch exception
-                if ~strcmp(exception.identifier, ...
-                        "MATLAB:audiovideo:VideoReader:Unexpected")
-                    rethrow(exception);
-                end
+        function startPoseTimer(textHandle, timerHandle)
+            if textHandle.Tag == "PoseStatus" && ...
+                    strcmp(timerHandle.Running, "off")
+                start(timerHandle);
             end
         end
+
+        function capturePoseStatus(timerHandle, appdataKey)
+            figureHandles = findall(groot, Type="figure", ...
+                Name="绳驱三自由度关节动画");
+            if isempty(figureHandles)
+                return;
+            end
+            poseStatus = findobj(figureHandles(1), Tag="PoseStatus");
+            if isempty(poseStatus)
+                return;
+            end
+            setappdata(groot, appdataKey, string(poseStatus.String));
+            stop(timerHandle);
+        end
+
+        function removeRootAppdata(appdataKey)
+            if isappdata(groot, appdataKey)
+                rmappdata(groot, appdataKey);
+            end
+        end
+
+        function aviFiles = listTemporaryAviFiles()
+            listing = dir(fullfile(tempdir, "*.avi"));
+            aviFiles = sort(string({listing.name}));
+        end
+
+        function nativeProfile = hasNativeMpeg4Profile()
+            profiles = VideoWriter.getProfiles;
+            nativeProfile = any(string({profiles.Name}) == "MPEG-4");
+        end
+
+        function cleanup = useTemporaryPath(pathValue)
+            originalPath = getenv("PATH");
+            setenv("PATH", pathValue);
+            cleanup = onCleanup(@() setenv("PATH", originalPath));
+        end
+
+        function createFailingFfmpeg(directory)
+            scriptPath = fullfile(directory, "ffmpeg");
+            fileId = fopen(scriptPath, "w");
+            cleanup = onCleanup(@() fclose(fileId));
+            fprintf(fileId, "#!/bin/sh\nexit 1\n");
+            clear cleanup;
+            [status, commandOutput] = system( ...
+                "chmod +x " + CableJointAnimationTest.shellQuote(scriptPath));
+            if status ~= 0
+                error("CableJointAnimationTest:ChmodFailed", ...
+                    "Failed to make fake ffmpeg executable: %s", ...
+                    commandOutput);
+            end
+        end
+
+        function quotedPath = shellQuote(filePath)
+            quotedPath = "'" + replace(string(filePath), "'", "'""'""'") + "'";
+        end
+
     end
 end

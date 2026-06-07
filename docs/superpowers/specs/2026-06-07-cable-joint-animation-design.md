@@ -158,8 +158,8 @@ movingCenter + R * movingPoints(:, i)
 5. 更新三根绳索端点；
 6. 更新中心圆柱高度；
 7. 更新当前时间和位姿文本；
-8. 调用 `drawnow`；
-9. 按 `time(k)` 与实际经过时间的差值暂停，实现 `1:1` 播放。
+8. 在更新第 `k` 帧前，按 `time(k) - time(1)` 与实际经过时间的差值暂停；
+9. 检查窗口仍有效后更新图形并调用 `drawnow`。
 
 若用户关闭动画窗口，循环应正常停止，不继续访问已失效的图形句柄。
 
@@ -189,7 +189,7 @@ exportVideo = false;
 exportVideo = true;
 ```
 
-优先使用 MATLAB `VideoWriter` 的 `"MPEG-4"` profile 直接创建 MP4。若当前平台不提供该 profile，则先使用 `"Motion JPEG AVI"` 写入临时 AVI，再调用系统 `ffmpeg` 和 `libx264` 转码为 `yuv420p` MP4；临时文件在成功、失败或异常退出时均应清理。若 `ffmpeg` 不可用或转码失败，使用明确的动画模块错误标识报告原因。
+优先使用 MATLAB `VideoWriter` 的 `"MPEG-4"` profile 直接创建 MP4。若当前平台不提供该 profile，则先使用 `"Motion JPEG AVI"` 写入临时 AVI，再调用系统 `ffmpeg` 转码为 MPEG-4 Part 2、`yuv420p` MP4。该编码组合可由当前 MATLAB R2025a/Linux 的 `VideoReader` 回读；该环境无法初始化 H.264 MP4。临时 AVI 的清理保护必须在 `VideoWriter.open` 前建立，确保打开、写入或转码任一阶段失败都不会残留临时文件。
 
 视频时间尺度与仿真时间一致。由于当前默认步长 `0.01 s` 对应 `100 fps`，实现时应采用兼容的固定输出帧率并按时间采样轨迹帧，而不是假定所有编码器都支持 `100 fps`。默认输出 `30 fps`，目标帧数为 `max(2, round(duration * fps))`，目标时刻通过 `linspace` 包含轨迹首尾，再选择最近的仿真帧。重复索引必须保留，以维持固定帧率下的视频时长。
 

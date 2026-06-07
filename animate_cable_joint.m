@@ -47,78 +47,87 @@ if options.ExportVideo && strlength(options.VideoFile) == 0
 end
 
 figureHandle = figure( ...
-    Name="", ...
+    Name="绳驱三自由度关节动画", ...
     Color="white", ...
     Position=[150, 100, 900, 760], ...
     Visible=options.Visible);
-setappdata(figureHandle, "CableJointSceneComplete", false);
 figureCleanup = onCleanup(@() delete_graphics(figureHandle));
-axesHandle = axes(figureHandle, Tag="CableJointAxes");
-hold(axesHandle, "on");
-grid(axesHandle, "on");
-axis(axesHandle, "equal");
-xlabel(axesHandle, "X / mm");
-ylabel(axesHandle, "Y / mm");
-zlabel(axesHandle, "Z / mm");
-title(axesHandle, "绳驱三自由度关节运动");
-view(axesHandle, 35, 24);
+try
+    setappdata(figureHandle, "CableJointSceneComplete", false);
+    axesHandle = axes(figureHandle, Tag="CableJointAxes");
+    hold(axesHandle, "on");
+    grid(axesHandle, "on");
+    axis(axesHandle, "equal");
+    xlabel(axesHandle, "X / mm");
+    ylabel(axesHandle, "Y / mm");
+    zlabel(axesHandle, "Z / mm");
+    title(axesHandle, "绳驱三自由度关节运动");
+    view(axesHandle, 35, 24);
 
-radialLimit = 1.15 * max(fixedPlatformRadius, movingPlatformRadius);
-xlim(axesHandle, [-radialLimit, radialLimit]);
-ylim(axesHandle, [-radialLimit, radialLimit]);
-heightExtent = [ ...
-    -options.PlatformThickness / 2, ...
-    qTrajectory(3, :) - movingPlatformRadius ...
-        - options.PlatformThickness / 2, ...
-    qTrajectory(3, :) + movingPlatformRadius ...
-        + options.PlatformThickness / 2];
-heightRange = max(heightExtent) - min(heightExtent);
-heightMargin = max(0.05 * heightRange, options.PlatformThickness);
-zlim(axesHandle, ...
-    [min(heightExtent) - heightMargin, max(heightExtent) + heightMargin]);
+    radialLimit = 1.15 * max(fixedPlatformRadius, movingPlatformRadius);
+    xlim(axesHandle, [-radialLimit, radialLimit]);
+    ylim(axesHandle, [-radialLimit, radialLimit]);
+    heightExtent = [ ...
+        -options.PlatformThickness / 2, ...
+        qTrajectory(3, :) - movingPlatformRadius ...
+            - options.PlatformThickness / 2, ...
+        qTrajectory(3, :) + movingPlatformRadius ...
+            + options.PlatformThickness / 2];
+    heightRange = max(heightExtent) - min(heightExtent);
+    heightMargin = max(0.05 * heightRange, options.PlatformThickness);
+    zlim(axesHandle, ...
+        [min(heightExtent) - heightMargin, max(heightExtent) + heightMargin]);
 
-create_disc(axesHandle, fixedPlatformRadius, ...
-    options.PlatformThickness, [0.72, 0.78, 0.86], "FixedPlatform");
-movingDisc = create_disc(axesHandle, movingPlatformRadius, ...
-    options.PlatformThickness, [0.92, 0.55, 0.24], "MovingPlatform");
+    create_disc(axesHandle, fixedPlatformRadius, ...
+        options.PlatformThickness, [0.72, 0.78, 0.86], "FixedPlatform");
+    movingDisc = create_disc(axesHandle, movingPlatformRadius, ...
+        options.PlatformThickness, [0.92, 0.55, 0.24], "MovingPlatform");
 
-[actuatorX, actuatorY, actuatorUnitZ] = ...
-    cylinder(options.ActuatorRadius, 36);
-actuatorHandle = surf(axesHandle, actuatorX, actuatorY, ...
-    actuatorUnitZ * qTrajectory(3, 1), ...
-    FaceColor=[0.45, 0.48, 0.52], ...
-    EdgeColor="none", ...
-    Tag="CenterActuator");
+    [actuatorX, actuatorY, actuatorUnitZ] = ...
+        cylinder(options.ActuatorRadius, 36);
+    actuatorHandle = surf(axesHandle, actuatorX, actuatorY, ...
+        actuatorUnitZ * qTrajectory(3, 1), ...
+        FaceColor=[0.45, 0.48, 0.52], ...
+        EdgeColor="none", ...
+        Tag="CenterActuator");
 
-cableColor = [0.12, 0.32, 0.62];
-cableHandles = gobjects(1, 3);
-for cableIndex = 1:3
-    cableHandles(cableIndex) = plot3(axesHandle, ...
-        [fixedPoints(1, cableIndex), movingPoints(1, cableIndex)], ...
-        [fixedPoints(2, cableIndex), movingPoints(2, cableIndex)], ...
-        [fixedPoints(3, cableIndex), movingPoints(3, cableIndex)], ...
-        Color=cableColor, LineWidth=2, ...
-        Tag="Cable" + cableIndex);
+    cableColor = [0.12, 0.32, 0.62];
+    cableHandles = gobjects(1, 3);
+    for cableIndex = 1:3
+        cableHandles(cableIndex) = plot3(axesHandle, ...
+            [fixedPoints(1, cableIndex), movingPoints(1, cableIndex)], ...
+            [fixedPoints(2, cableIndex), movingPoints(2, cableIndex)], ...
+            [fixedPoints(3, cableIndex), movingPoints(3, cableIndex)], ...
+            Color=cableColor, LineWidth=2, ...
+            Tag="Cable" + cableIndex);
+    end
+    scatter3(axesHandle, ...
+        fixedPoints(1, :), fixedPoints(2, :), fixedPoints(3, :), ...
+        48, [0.18, 0.18, 0.18], "filled", Tag="FixedNodes");
+    movingNodesHandle = scatter3(axesHandle, ...
+        movingPoints(1, :), movingPoints(2, :), movingPoints(3, :), ...
+        48, [0.86, 0.18, 0.12], "filled", Tag="MovingNodes");
+    poseStatusHandle = text(axesHandle, 0.02, 0.98, "", ...
+        Units="normalized", VerticalAlignment="top", ...
+        FontName="FixedWidth", Tag="PoseStatus");
+catch exception
+    if ~isgraphics(figureHandle)
+        clear figureCleanup;
+        return;
+    end
+    rethrow(exception);
 end
-scatter3(axesHandle, ...
-    fixedPoints(1, :), fixedPoints(2, :), fixedPoints(3, :), ...
-    48, [0.18, 0.18, 0.18], "filled", Tag="FixedNodes");
-movingNodesHandle = scatter3(axesHandle, ...
-    movingPoints(1, :), movingPoints(2, :), movingPoints(3, :), ...
-    48, [0.86, 0.18, 0.12], "filled", Tag="MovingNodes");
-poseStatusHandle = text(axesHandle, 0.02, 0.98, "", ...
-    Units="normalized", VerticalAlignment="top", ...
-    FontName="FixedWidth", Tag="PoseStatus");
 
 videoWriter = [];
 temporaryVideoFile = "";
 useFfmpegFallback = false;
 if options.ExportVideo
     [videoWriter, temporaryVideoFile, useFfmpegFallback] = ...
-        create_video_writer(options.VideoFile, options.VideoFrameRate);
-    videoCleanup = onCleanup(@() close_video_writer(videoWriter));
+        prepare_video_writer(options.VideoFile, options.VideoFrameRate);
     temporaryFileCleanup = onCleanup( ...
         @() delete_file_if_present(temporaryVideoFile));
+    open(videoWriter);
+    videoCleanup = onCleanup(@() close_video_writer(videoWriter));
     frameIndices = select_video_frames(time, options.VideoFrameRate);
 else
     frameIndices = 1:sampleCount;
@@ -126,10 +135,19 @@ end
 
 playbackClock = tic;
 playbackStartTime = time(1);
-figureHandle.Name = "绳驱三自由度关节动画";
 for frameIndex = frameIndices
     if ~isgraphics(figureHandle)
         break;
+    end
+    if options.RealtimePlayback && ~options.ExportVideo
+        targetElapsed = time(frameIndex) - playbackStartTime;
+        remainingTime = targetElapsed - toc(playbackClock);
+        if remainingTime > 0
+            pause(remainingTime);
+        end
+        if ~isgraphics(figureHandle)
+            break;
+        end
     end
     update_frame(frameIndex, time, qTrajectory, fixedPoints, movingPoints, ...
         movingDisc, movingNodesHandle, cableHandles, ...
@@ -144,15 +162,6 @@ for frameIndex = frameIndices
     end
     if options.ExportVideo
         writeVideo(videoWriter, getframe(figureHandle));
-    elseif options.RealtimePlayback
-        targetElapsed = time(frameIndex) - playbackStartTime;
-        remainingTime = targetElapsed - toc(playbackClock);
-        if remainingTime > 0
-            pause(remainingTime);
-        end
-        if ~isgraphics(figureHandle)
-            break;
-        end
     end
 end
 
@@ -273,8 +282,8 @@ frameIndices(end) = numel(time);
 end
 
 function [videoWriter, temporaryVideoFile, useFfmpegFallback] = ...
-        create_video_writer(videoFile, frameRate)
-%CREATE_VIDEO_WRITER Prefer native MP4 and otherwise prepare an AVI fallback.
+        prepare_video_writer(videoFile, frameRate)
+%PREPARE_VIDEO_WRITER Select a profile without opening the output file.
 
 profiles = VideoWriter.getProfiles;
 profileNames = string({profiles.Name});
@@ -285,8 +294,7 @@ if useFfmpegFallback
     [ffmpegStatus, ~] = system("command -v ffmpeg >/dev/null 2>&1");
     if ffmpegStatus ~= 0
         error("CableJointAnimation:Mp4EncoderUnavailable", ...
-            ["MATLAB does not provide the MPEG-4 VideoWriter profile " ...
-             "and ffmpeg is not available on PATH."]);
+            "MATLAB has no MPEG-4 profile and ffmpeg is not on PATH.");
     end
     temporaryVideoFile = string(tempname) + ".avi";
     videoWriter = VideoWriter(temporaryVideoFile, "Motion JPEG AVI");
@@ -294,7 +302,6 @@ else
     videoWriter = VideoWriter(videoFile, "MPEG-4");
 end
 videoWriter.FrameRate = frameRate;
-open(videoWriter);
 end
 
 function close_video_writer(videoWriter)
@@ -316,7 +323,7 @@ function encode_mp4_with_ffmpeg(inputFile, outputFile)
 %ENCODE_MP4_WITH_FFMPEG Transcode the fallback AVI to broadly compatible MP4.
 
 command = "ffmpeg -y -loglevel error -i " + shell_quote(inputFile) + ...
-    " -c:v libx264 -pix_fmt yuv420p " + shell_quote(outputFile);
+    " -c:v mpeg4 -q:v 3 -pix_fmt yuv420p " + shell_quote(outputFile);
 [status, commandOutput] = system(command);
 if status ~= 0 || ~isfile(outputFile)
     delete_file_if_present(outputFile);
