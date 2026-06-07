@@ -10,6 +10,10 @@ close all;
 fixedPlatformRadius = 160;
 movingPlatformRadius = 80;
 drumRadius = 15;
+platformThickness = 1;
+actuatorRadius = 5;
+exportVideo = false;
+videoFile = "cable_joint_motion.mp4";
 
 fixedPoints = platform_points(fixedPlatformRadius);
 movingPoints = platform_points(movingPlatformRadius);
@@ -49,6 +53,14 @@ fprintf("最终绳长 / mm：\n");
 disp(cableLength(:, end));
 fprintf("最终卷筒角度 / deg：\n");
 disp(rad2deg(actuatorCommand(:, end)));
+
+animate_cable_joint( ...
+    time, qTrajectory, fixedPoints, movingPoints, ...
+    fixedPlatformRadius, movingPlatformRadius, ...
+    PlatformThickness=platformThickness, ...
+    ActuatorRadius=actuatorRadius, ...
+    ExportVideo=exportVideo, ...
+    VideoFile=videoFile);
 
 plot_results(time, qTrajectory, cableLength, cableSpeed, ...
     actuatorCommand, jacobianCondition);
