@@ -217,6 +217,99 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
             testCase.verifyThat(poseStatus.String, ...
                 matlab.unittest.constraints.ContainsSubstring("h = 45"));
         end
+
+        function testDoesNotCreateVideoWhenExportDisabled(testCase)
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            videoFile = string(tempname) + ".mp4";
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteFileIfPresent(videoFile));
+
+            animate_cable_joint( ...
+                [0, 0.1], [0, 0; 0, 0; 39, 40], ...
+                fixedPoints, movingPoints, 160, 80, ...
+                ExportVideo=false, VideoFile=videoFile, ...
+                RealtimePlayback=false, Visible="off");
+
+            testCase.verifyFalse(isfile(videoFile));
+        end
+
+        function testExportsNonemptyMp4WithTrajectoryDuration(testCase)
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            time = 0:0.02:0.1;
+            qTrajectory = [ ...
+                linspace(0, deg2rad(2), numel(time)); ...
+                linspace(0, deg2rad(-1), numel(time)); ...
+                linspace(39, 42, numel(time))];
+            videoFile = string(tempname) + ".mp4";
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteFileIfPresent(videoFile));
+
+            animate_cable_joint( ...
+                time, qTrajectory, fixedPoints, movingPoints, ...
+                160, 80, ExportVideo=true, VideoFile=videoFile, ...
+                VideoFrameRate=30, RealtimePlayback=false, Visible="on");
+
+            videoInfo = dir(videoFile);
+            testCase.assertTrue(isfile(videoFile));
+            testCase.verifyGreaterThan(videoInfo.bytes, 0);
+            videoDuration = ...
+                CableJointAnimationTest.readVideoDuration(videoFile);
+            if ~isempty(videoDuration)
+                testCase.verifyEqual(videoDuration, 0.1, AbsTol=0.08);
+            end
+        end
+
+        function testRealtimePlaybackTracksSimulationTime(testCase)
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            time = 0:0.05:0.1;
+            qTrajectory = [zeros(2, numel(time)); 39, 40, 41];
+
+            warmupFigure = animate_cable_joint( ...
+                0, [0; 0; 39], fixedPoints, movingPoints, ...
+                160, 80, ExportVideo=false, ...
+                RealtimePlayback=false, Visible="off");
+            delete(warmupFigure);
+
+            playbackTimer = tic;
+            animate_cable_joint( ...
+                time, qTrajectory, fixedPoints, movingPoints, ...
+                160, 80, ExportVideo=false, ...
+                RealtimePlayback=true, Visible="off");
+            elapsed = toc(playbackTimer);
+
+            testCase.verifyGreaterThanOrEqual(elapsed, 0.08);
+            testCase.verifyLessThan(elapsed, 1);
+        end
+
+        function testClosingWindowStopsRealtimePlaybackSafely(testCase)
+            [fixedPoints, movingPoints] = ...
+                CableJointAnimationTest.platformGeometry();
+            time = 0:0.05:1;
+            qTrajectory = [zeros(2, numel(time)); ...
+                linspace(39, 45, numel(time))];
+            windowName = "绳驱三自由度关节动画";
+            closeTimer = timer( ...
+                StartDelay=0.03, ...
+                ExecutionMode="fixedSpacing", ...
+                Period=0.03, ...
+                TasksToExecute=100, ...
+                TimerFcn=@(timerHandle, ~) ...
+                    CableJointAnimationTest.closeFigureByName( ...
+                        timerHandle, windowName));
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.deleteTimer(closeTimer));
+            start(closeTimer);
+
+            figureHandle = animate_cable_joint( ...
+                time, qTrajectory, fixedPoints, movingPoints, ...
+                160, 80, ExportVideo=false, ...
+                RealtimePlayback=true, Visible="on");
+
+            testCase.verifyFalse(isgraphics(figureHandle));
+        end
     end
 
     methods (Static, Access=private)
@@ -235,6 +328,46 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
                 80, -40, -40;
                 0, 40 * sqrt(3), -40 * sqrt(3);
                 0, 0, 0];
+        end
+
+        function closeFigureByName(timerHandle, windowName)
+            figureHandles = findall(groot, ...
+                Type="figure", Name=windowName);
+            if isempty(figureHandles)
+                return;
+            end
+            delete(figureHandles(isgraphics(figureHandles)));
+            stop(timerHandle);
+        end
+
+        function deleteTimer(timerHandle)
+            if ~isvalid(timerHandle)
+                return;
+            end
+            stop(timerHandle);
+            delete(timerHandle);
+        end
+
+        function deleteFileIfPresent(filePath)
+            if isfile(filePath)
+                delete(filePath);
+            end
+        end
+
+        function duration = readVideoDuration(videoFile)
+            duration = [];
+            if exist("VideoReader", "class") ~= 8
+                return;
+            end
+            try
+                reader = VideoReader(videoFile);
+                duration = reader.Duration;
+            catch exception
+                if ~strcmp(exception.identifier, ...
+                        "MATLAB:audiovideo:VideoReader:Unexpected")
+                    rethrow(exception);
+                end
+            end
         end
     end
 end

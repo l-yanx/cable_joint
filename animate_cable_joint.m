@@ -47,7 +47,7 @@ if options.ExportVideo && strlength(options.VideoFile) == 0
 end
 
 figureHandle = figure( ...
-    Name="绳驱三自由度关节动画", ...
+    Name="", ...
     Color="white", ...
     Position=[150, 100, 900, 760], ...
     Visible=options.Visible);
@@ -110,17 +110,58 @@ poseStatusHandle = text(axesHandle, 0.02, 0.98, "", ...
     Units="normalized", VerticalAlignment="top", ...
     FontName="FixedWidth", Tag="PoseStatus");
 
-for frameIndex = 1:sampleCount
+videoWriter = [];
+temporaryVideoFile = "";
+useFfmpegFallback = false;
+if options.ExportVideo
+    [videoWriter, temporaryVideoFile, useFfmpegFallback] = ...
+        create_video_writer(options.VideoFile, options.VideoFrameRate);
+    videoCleanup = onCleanup(@() close_video_writer(videoWriter));
+    temporaryFileCleanup = onCleanup( ...
+        @() delete_file_if_present(temporaryVideoFile));
+    frameIndices = select_video_frames(time, options.VideoFrameRate);
+else
+    frameIndices = 1:sampleCount;
+end
+
+playbackClock = tic;
+playbackStartTime = time(1);
+figureHandle.Name = "绳驱三自由度关节动画";
+for frameIndex = frameIndices
     if ~isgraphics(figureHandle)
         break;
     end
     update_frame(frameIndex, time, qTrajectory, fixedPoints, movingPoints, ...
         movingDisc, movingNodesHandle, cableHandles, ...
         actuatorHandle, actuatorUnitZ, poseStatusHandle);
-    drawnow;
+    if options.ExportVideo
+        drawnow;
+    else
+        drawnow limitrate;
+    end
     if ~isgraphics(figureHandle)
         break;
     end
+    if options.ExportVideo
+        writeVideo(videoWriter, getframe(figureHandle));
+    elseif options.RealtimePlayback
+        targetElapsed = time(frameIndex) - playbackStartTime;
+        remainingTime = targetElapsed - toc(playbackClock);
+        if remainingTime > 0
+            pause(remainingTime);
+        end
+        if ~isgraphics(figureHandle)
+            break;
+        end
+    end
+end
+
+if options.ExportVideo
+    clear videoCleanup;
+    if useFfmpegFallback
+        encode_mp4_with_ffmpeg(temporaryVideoFile, options.VideoFile);
+    end
+    clear temporaryFileCleanup;
 end
 
 if ~isgraphics(figureHandle)
@@ -214,6 +255,88 @@ function worldPoints = transform_points(localPoints, position, rotation)
 %TRANSFORM_POINTS Transform local columns into world-coordinate columns.
 
 worldPoints = position + rotation * localPoints;
+end
+
+function frameIndices = select_video_frames(time, frameRate)
+%SELECT_VIDEO_FRAMES Map fixed-rate output times to nearest input samples.
+
+duration = time(end) - time(1);
+outputFrameCount = max(2, round(duration * frameRate));
+outputTimes = linspace(time(1), time(end), outputFrameCount);
+frameIndices = zeros(size(outputTimes));
+for outputIndex = 1:numel(outputTimes)
+    [~, frameIndices(outputIndex)] = ...
+        min(abs(time - outputTimes(outputIndex)));
+end
+frameIndices(1) = 1;
+frameIndices(end) = numel(time);
+end
+
+function [videoWriter, temporaryVideoFile, useFfmpegFallback] = ...
+        create_video_writer(videoFile, frameRate)
+%CREATE_VIDEO_WRITER Prefer native MP4 and otherwise prepare an AVI fallback.
+
+profiles = VideoWriter.getProfiles;
+profileNames = string({profiles.Name});
+useFfmpegFallback = ~any(profileNames == "MPEG-4");
+temporaryVideoFile = "";
+
+if useFfmpegFallback
+    [ffmpegStatus, ~] = system("command -v ffmpeg >/dev/null 2>&1");
+    if ffmpegStatus ~= 0
+        error("CableJointAnimation:Mp4EncoderUnavailable", ...
+            ["MATLAB does not provide the MPEG-4 VideoWriter profile " ...
+             "and ffmpeg is not available on PATH."]);
+    end
+    temporaryVideoFile = string(tempname) + ".avi";
+    videoWriter = VideoWriter(temporaryVideoFile, "Motion JPEG AVI");
+else
+    videoWriter = VideoWriter(videoFile, "MPEG-4");
+end
+videoWriter.FrameRate = frameRate;
+open(videoWriter);
+end
+
+function close_video_writer(videoWriter)
+%CLOSE_VIDEO_WRITER Finalize a VideoWriter during normal or error cleanup.
+
+if isempty(videoWriter)
+    return;
+end
+try
+    close(videoWriter);
+catch exception
+    if ~strcmp(exception.identifier, "MATLAB:audiovideo:VideoWriter:notOpen")
+        rethrow(exception);
+    end
+end
+end
+
+function encode_mp4_with_ffmpeg(inputFile, outputFile)
+%ENCODE_MP4_WITH_FFMPEG Transcode the fallback AVI to broadly compatible MP4.
+
+command = "ffmpeg -y -loglevel error -i " + shell_quote(inputFile) + ...
+    " -c:v libx264 -pix_fmt yuv420p " + shell_quote(outputFile);
+[status, commandOutput] = system(command);
+if status ~= 0 || ~isfile(outputFile)
+    delete_file_if_present(outputFile);
+    error("CableJointAnimation:Mp4EncodingFailed", ...
+        "ffmpeg failed to encode MP4: %s", strtrim(commandOutput));
+end
+end
+
+function quotedPath = shell_quote(filePath)
+%SHELL_QUOTE Quote one path for a POSIX shell command.
+
+quotedPath = "'" + replace(string(filePath), "'", "'""'""'") + "'";
+end
+
+function delete_file_if_present(filePath)
+%DELETE_FILE_IF_PRESENT Remove a temporary or incomplete video file.
+
+if strlength(filePath) > 0 && isfile(filePath)
+    delete(filePath);
+end
 end
 
 function delete_graphics(graphicsHandle)

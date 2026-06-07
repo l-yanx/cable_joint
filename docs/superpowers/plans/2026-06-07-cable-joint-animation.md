@@ -6,7 +6,7 @@
 
 **Architecture:** Put all rendering, timing, validation, and video-export behavior in one new public function, `animate_cable_joint.m`, with focused local helper functions. Add a separate animation test class. Modify `main_run.m` only to define visualization options and call the new function; do not modify existing computational functions or `plot_results.m`.
 
-**Tech Stack:** MATLAB graphics (`figure`, `surf`, `plot3`, `scatter3`), `VideoWriter`, `matlab.unittest`.
+**Tech Stack:** MATLAB graphics (`figure`, `surf`, `plot3`, `scatter3`), `VideoWriter`, optional `ffmpeg`/`libx264` fallback, `matlab.unittest`.
 
 **Repository note:** `/home/lyx/cable joint` is not currently a Git worktree. The normal per-task commit steps are replaced by explicit verification checkpoints. Do not initialize Git as part of this feature.
 
@@ -528,7 +528,7 @@ Expected: all tests pass and the returned figure contains the final frame.
 - Modify: `animate_cable_joint.m`
 - Modify: `tests/CableJointAnimationTest.m`
 
-- [ ] **Step 1: Add a failing test that default video sampling covers both endpoints**
+- [x] **Step 1: Add failing tests for export, real-time pacing, and safe window closure**
 
 Add an export integration test:
 
@@ -578,7 +578,7 @@ function testDoesNotCreateVideoWhenDisabled(testCase)
 end
 ```
 
-- [ ] **Step 2: Run the export tests and verify the enabled case fails**
+- [x] **Step 2: Run the export tests and verify the enabled case fails**
 
 Run:
 
@@ -592,17 +592,12 @@ disp(results);
 
 Expected: disabled case passes; enabled case fails because no video is written.
 
-- [ ] **Step 3: Add deterministic video-frame selection**
+- [x] **Step 3: Add deterministic video-frame selection**
 
 Add:
 
 ```matlab
 function frameIndices = select_video_frames(time, frameRate)
-    if numel(time) == 1
-        frameIndices = 1;
-        return;
-    end
-
     duration = time(end) - time(1);
     outputFrameCount = max(2, round(duration * frameRate));
     outputTimes = linspace(time(1), time(end), outputFrameCount);
@@ -619,9 +614,11 @@ end
 
 Do not remove duplicate indices. Repeating a nearest simulation frame is required when the simulation sampling rate is lower than the requested video frame rate; removing duplicates would shorten the encoded duration.
 
-- [ ] **Step 4: Add safe `VideoWriter` lifecycle**
+- [x] **Step 4: Add safe `VideoWriter` lifecycle**
 
-Before the loop:
+Before the loop, prefer the native `"MPEG-4"` profile. If it is unavailable,
+create a temporary `"Motion JPEG AVI"` writer and require `ffmpeg` on `PATH`.
+Protect both the writer and temporary file with `onCleanup`.
 
 ```matlab
     videoWriter = [];
@@ -654,7 +651,9 @@ function close_video_writer(videoWriter)
 end
 ```
 
-After the loop, explicitly clear the cleanup object so the file is finalized before returning:
+After the loop, explicitly clear the writer cleanup so the file is finalized.
+For the fallback path, transcode with `libx264` and `-pix_fmt yuv420p`, then
+delete the temporary AVI:
 
 ```matlab
     if options.ExportVideo
@@ -662,7 +661,7 @@ After the loop, explicitly clear the cleanup object so the file is finalized bef
     end
 ```
 
-- [ ] **Step 5: Add `1:1` real-time pacing for interactive playback**
+- [x] **Step 5: Add `1:1` real-time pacing for interactive playback**
 
 Only pace frames when `RealtimePlayback=true` and `ExportVideo=false`:
 
@@ -685,7 +684,7 @@ At the end of each interactive frame:
 
 The loop must check `isgraphics(figureHandle)` before and after `drawnow` so closing the window exits cleanly.
 
-- [ ] **Step 6: Run all animation tests**
+- [x] **Step 6: Run all animation tests**
 
 Run:
 
@@ -696,7 +695,10 @@ assertSuccess(results);
 
 Expected: validation, geometry, endpoint, disabled export, and MP4 export tests all pass.
 
-If the installed MATLAB lacks the `"MPEG-4"` profile, do not silently change the product behavior. Record the exact MATLAB error and replace only the export test with an assumption guarded by `VideoWriter.getProfiles`; interactive animation tests must still pass.
+If the installed MATLAB lacks the `"MPEG-4"` profile, use the documented
+Motion JPEG AVI plus `ffmpeg` fallback. Raise
+`CableJointAnimation:Mp4EncoderUnavailable` when `ffmpeg` is missing and
+`CableJointAnimation:Mp4EncodingFailed` when transcoding fails.
 
 ---
 

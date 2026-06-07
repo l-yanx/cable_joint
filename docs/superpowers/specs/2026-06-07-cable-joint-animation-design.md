@@ -189,7 +189,9 @@ exportVideo = false;
 exportVideo = true;
 ```
 
-使用 `VideoWriter` 创建 MP4。视频时间尺度与仿真时间一致。由于当前默认步长 `0.01 s` 对应 `100 fps`，实现时应采用兼容的固定输出帧率并按时间采样轨迹帧，而不是假定所有编码器都支持 `100 fps`。推荐默认输出 `30 fps`，按目标视频时刻选择最接近的仿真帧。
+优先使用 MATLAB `VideoWriter` 的 `"MPEG-4"` profile 直接创建 MP4。若当前平台不提供该 profile，则先使用 `"Motion JPEG AVI"` 写入临时 AVI，再调用系统 `ffmpeg` 和 `libx264` 转码为 `yuv420p` MP4；临时文件在成功、失败或异常退出时均应清理。若 `ffmpeg` 不可用或转码失败，使用明确的动画模块错误标识报告原因。
+
+视频时间尺度与仿真时间一致。由于当前默认步长 `0.01 s` 对应 `100 fps`，实现时应采用兼容的固定输出帧率并按时间采样轨迹帧，而不是假定所有编码器都支持 `100 fps`。默认输出 `30 fps`，目标帧数为 `max(2, round(duration * fps))`，目标时刻通过 `linspace` 包含轨迹首尾，再选择最近的仿真帧。重复索引必须保留，以维持固定帧率下的视频时长。
 
 实时节拍仅用于交互播放。导出模式下无需通过额外暂停控制视频编码速度，但生成的视频时长应与仿真 `duration` 一致。
 
@@ -202,6 +204,8 @@ exportVideo = true;
 - 平台半径、平台厚度和执行器半径为正数；
 - `fixedPoints` 和 `movingPoints` 均为 `3 x 3`；
 - 导出开启时，视频文件名非空。
+- MATLAB 无原生 MPEG-4 profile 且系统找不到 `ffmpeg` 时，错误标识为 `CableJointAnimation:Mp4EncoderUnavailable`；
+- `ffmpeg` 转码失败时，错误标识为 `CableJointAnimation:Mp4EncodingFailed`。
 
 无效输入使用明确的 MATLAB 错误标识和错误信息。
 
