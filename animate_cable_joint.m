@@ -8,13 +8,16 @@ arguments
     qTrajectory (3, :) double
     fixedPoints (3, 3) double
     movingPoints (3, 3) double
-    fixedPlatformRadius (1, 1) double {mustBePositive}
-    movingPlatformRadius (1, 1) double {mustBePositive}
-    options.PlatformThickness (1, 1) double {mustBePositive} = 1
-    options.ActuatorRadius (1, 1) double {mustBePositive} = 5
+    fixedPlatformRadius (1, 1) double {mustBePositive, mustBeFinite}
+    movingPlatformRadius (1, 1) double {mustBePositive, mustBeFinite}
+    options.PlatformThickness (1, 1) double ...
+        {mustBePositive, mustBeFinite} = 1
+    options.ActuatorRadius (1, 1) double ...
+        {mustBePositive, mustBeFinite} = 5
     options.ExportVideo (1, 1) logical = false
     options.VideoFile (1, 1) string = "cable_joint_motion.mp4"
-    options.VideoFrameRate (1, 1) double {mustBePositive} = 30
+    options.VideoFrameRate (1, 1) double ...
+        {mustBePositive, mustBeFinite} = 30
     options.RealtimePlayback (1, 1) logical = true
     options.Visible (1, 1) matlab.lang.OnOffSwitchState = "on"
 end
@@ -48,6 +51,8 @@ figureHandle = figure( ...
     Color="white", ...
     Position=[150, 100, 900, 760], ...
     Visible=options.Visible);
+setappdata(figureHandle, "CableJointSceneComplete", false);
+figureCleanup = onCleanup(@() delete_graphics(figureHandle));
 axesHandle = axes(figureHandle, Tag="CableJointAxes");
 hold(axesHandle, "on");
 grid(axesHandle, "on");
@@ -63,15 +68,17 @@ xlim(axesHandle, [-radialLimit, radialLimit]);
 ylim(axesHandle, [-radialLimit, radialLimit]);
 heightExtent = [ ...
     -options.PlatformThickness / 2, ...
-    qTrajectory(3, :) - options.PlatformThickness / 2, ...
-    qTrajectory(3, :) + options.PlatformThickness / 2];
+    qTrajectory(3, :) - movingPlatformRadius ...
+        - options.PlatformThickness / 2, ...
+    qTrajectory(3, :) + movingPlatformRadius ...
+        + options.PlatformThickness / 2];
 heightRange = max(heightExtent) - min(heightExtent);
 heightMargin = max(0.05 * heightRange, options.PlatformThickness);
 zlim(axesHandle, ...
     [min(heightExtent) - heightMargin, max(heightExtent) + heightMargin]);
 
 create_disc(axesHandle, fixedPlatformRadius, ...
-    options.PlatformThickness, [0.72, 0.78, 0.86]);
+    options.PlatformThickness, [0.72, 0.78, 0.86], "FixedPlatform");
 
 [actuatorX, actuatorY, actuatorZ] = cylinder(options.ActuatorRadius, 36);
 actuatorZ = actuatorZ * qTrajectory(3, 1);
@@ -79,13 +86,15 @@ surf(axesHandle, actuatorX, actuatorY, actuatorZ, ...
     FaceColor=[0.45, 0.48, 0.52], ...
     EdgeColor="none", ...
     Tag="CenterActuator");
+setappdata(figureHandle, "CableJointSceneComplete", true);
+clear figureCleanup;
 end
 
 function groupHandle = create_disc( ...
-        axesHandle, radius, thickness, faceColor)
+        axesHandle, radius, thickness, faceColor, tag)
 %CREATE_DISC Draw a closed cylindrical platform from three surfaces.
 
-groupHandle = hggroup(axesHandle, Tag="FixedPlatform");
+groupHandle = hggroup(axesHandle, Tag=tag);
 theta = linspace(0, 2 * pi, 37);
 radialCoordinates = [zeros(size(theta)); radius * ones(size(theta))];
 xCoordinates = radialCoordinates .* cos(theta);
@@ -103,4 +112,17 @@ sideY = radius * [sin(theta); sin(theta)];
 sideZ = repmat([-thickness / 2; thickness / 2], 1, numel(theta));
 surf(sideX, sideY, sideZ, Parent=groupHandle, ...
     FaceColor=0.85 * faceColor, EdgeColor="none", Tag="Side");
+end
+
+function delete_graphics(graphicsHandle)
+%DELETE_GRAPHICS Delete a graphics object when it is still valid.
+
+if ~isgraphics(graphicsHandle)
+    return;
+end
+if getappdata(graphicsHandle, "CableJointSceneComplete")
+    rmappdata(graphicsHandle, "CableJointSceneComplete");
+else
+    delete(graphicsHandle);
+end
 end
