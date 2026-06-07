@@ -323,7 +323,7 @@ function encode_mp4_with_ffmpeg(inputFile, outputFile)
 %ENCODE_MP4_WITH_FFMPEG Transcode the fallback AVI to broadly compatible MP4.
 
 command = "ffmpeg -y -loglevel error -i " + shell_quote(inputFile) + ...
-    " -c:v mpeg4 -q:v 3 -pix_fmt yuv420p " + shell_quote(outputFile);
+    " -c:v libx264 -pix_fmt yuv420p " + shell_quote(outputFile);
 [status, commandOutput] = system(command);
 if status ~= 0 || ~isfile(outputFile)
     delete_file_if_present(outputFile);

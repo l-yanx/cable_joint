@@ -252,16 +252,14 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
             videoInfo = dir(videoFile);
             testCase.assertTrue(isfile(videoFile));
             testCase.verifyGreaterThan(videoInfo.bytes, 0);
-            reader = VideoReader(videoFile);
-            testCase.verifyEqual(reader.FrameRate, 30, AbsTol=0.1);
-            testCase.verifyEqual(reader.Duration, 0.1, AbsTol=0.04);
-            testCase.verifyEqual(reader.NumFrames, 3);
-            firstFrame = readFrame(reader);
-            lastFrame = firstFrame;
-            while hasFrame(reader)
-                lastFrame = readFrame(reader);
-            end
-            testCase.verifyNotEqual(firstFrame, lastFrame);
+            metadata = CableJointAnimationTest.probeVideo(videoFile);
+            testCase.verifyEqual(metadata.FrameRate, 30, AbsTol=0.1);
+            testCase.verifyEqual(metadata.Duration, 0.1, AbsTol=0.04);
+            testCase.verifyEqual(metadata.FrameCount, 3);
+            frameHashes = ...
+                CableJointAnimationTest.readVideoFrameHashes(videoFile);
+            testCase.verifyNumElements(frameHashes, 3);
+            testCase.verifyNotEqual(frameHashes(1), frameHashes(end));
             testCase.verifyEqual( ...
                 CableJointAnimationTest.listTemporaryAviFiles(), ...
                 aviFilesBefore);
@@ -512,6 +510,44 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
 
         function quotedPath = shellQuote(filePath)
             quotedPath = "'" + replace(string(filePath), "'", "'""'""'") + "'";
+        end
+
+        function metadata = probeVideo(videoFile)
+            command = "ffprobe -v error -select_streams v:0 " + ...
+                "-show_entries stream=r_frame_rate,nb_frames:" + ...
+                "format=duration -of json " + ...
+                CableJointAnimationTest.shellQuote(videoFile);
+            [status, commandOutput] = system(command);
+            if status ~= 0
+                error("CableJointAnimationTest:FfprobeFailed", ...
+                    "ffprobe failed: %s", commandOutput);
+            end
+
+            probeResult = jsondecode(commandOutput);
+            frameRateParts = split( ...
+                string(probeResult.streams.r_frame_rate), "/");
+            metadata.FrameRate = ...
+                str2double(frameRateParts(1)) / str2double(frameRateParts(2));
+            metadata.FrameCount = ...
+                str2double(string(probeResult.streams.nb_frames));
+            metadata.Duration = ...
+                str2double(string(probeResult.format.duration));
+        end
+
+        function frameHashes = readVideoFrameHashes(videoFile)
+            command = "ffmpeg -v error -i " + ...
+                CableJointAnimationTest.shellQuote(videoFile) + ...
+                " -map 0:v:0 -f framemd5 -";
+            [status, commandOutput] = system(command);
+            if status ~= 0
+                error("CableJointAnimationTest:FrameHashFailed", ...
+                    "ffmpeg frame hashing failed: %s", commandOutput);
+            end
+
+            hashTokens = regexp(commandOutput, ...
+                "(?m)^[^#\r\n]*,\s*([0-9a-f]{32})\s*$", "tokens");
+            frameHashes = string(cellfun( ...
+                @(token) token{1}, hashTokens, UniformOutput=false));
         end
 
     end
