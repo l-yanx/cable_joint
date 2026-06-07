@@ -1,0 +1,42 @@
+<h2>动画观察方式</h2>
+<p class="subtitle">两种方式都保持坐标轴范围固定，避免机构运动时画面缩放跳动。</p>
+
+<div class="cards">
+  <div class="card" data-choice="fixed-camera" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f7fafc">
+      <svg viewBox="0 0 360 230" width="100%">
+        <line x1="52" y1="194" x2="312" y2="194" stroke="#40546d" stroke-width="9"/>
+        <ellipse cx="182" cy="67" rx="82" ry="20" fill="#e0a95b" stroke="#80561f" stroke-width="3" transform="rotate(-9 182 67)"/>
+        <path d="M169 188 L169 78 L195 78 L195 188 Z" fill="#668bb8" stroke="#294965" stroke-width="3"/>
+        <line x1="52" y1="194" x2="101" y2="79" stroke="#d1495b" stroke-width="4"/>
+        <line x1="312" y1="194" x2="263" y2="54" stroke="#2a9d8f" stroke-width="4"/>
+        <path d="M290 35 l22 9 l-22 9 z" fill="#536675"/>
+        <line x1="312" y1="44" x2="269" y2="67" stroke="#536675" stroke-width="3"/>
+        <text x="238" y="25" fill="#536675">固定视角</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A. 固定三维视角</h3>
+      <p>相机不动，只更新机构。姿态变化容易比较，播放稳定。推荐。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="orbit-camera" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f7fafc">
+      <svg viewBox="0 0 360 230" width="100%">
+        <line x1="52" y1="194" x2="312" y2="194" stroke="#40546d" stroke-width="9"/>
+        <ellipse cx="182" cy="67" rx="82" ry="20" fill="#e0a95b" stroke="#80561f" stroke-width="3" transform="rotate(-9 182 67)"/>
+        <path d="M169 188 L169 78 L195 78 L195 188 Z" fill="#668bb8" stroke="#294965" stroke-width="3"/>
+        <line x1="52" y1="194" x2="101" y2="79" stroke="#d1495b" stroke-width="4"/>
+        <line x1="312" y1="194" x2="263" y2="54" stroke="#2a9d8f" stroke-width="4"/>
+        <path d="M74 42 C122 7 257 7 302 43" fill="none" stroke="#536675" stroke-width="3" stroke-dasharray="6 5"/>
+        <path d="M295 34 l18 10 l-18 8 z" fill="#536675"/>
+        <text x="125" y="24" fill="#536675">相机缓慢环绕</text>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B. 环绕相机</h3>
+      <p>画面更有展示感，但相机和机构同时运动，不利于精确观察倾角变化。</p>
+    </div>
+  </div>
+</div>

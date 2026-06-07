@@ -1,0 +1,43 @@
+<h2>动画窗口如何组织？</h2>
+<p class="subtitle">现有五张结果曲线保持不变，差别在于机构动画放在哪里。</p>
+
+<div class="cards">
+  <div class="card" data-choice="separate-window" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f7fafc">
+      <div style="border:3px solid #40546d;border-radius:8px;background:white">
+        <div style="padding:8px 12px;background:#dce5ef;color:#294965;font-weight:700">绳驱关节三维动画</div>
+        <svg viewBox="0 0 380 235" width="100%">
+          <ellipse cx="190" cy="195" rx="140" ry="25" fill="#b7c4d6" stroke="#40546d" stroke-width="3"/>
+          <path d="M172 188 L172 83 L208 83 L208 188 Z" fill="#668bb8" stroke="#294965" stroke-width="3"/>
+          <ellipse cx="190" cy="69" rx="90" ry="22" fill="#e0a95b" stroke="#80561f" stroke-width="3" transform="rotate(-8 190 69)"/>
+          <line x1="50" y1="195" x2="101" y2="81" stroke="#d1495b" stroke-width="4"/>
+          <line x1="330" y1="195" x2="279" y2="56" stroke="#2a9d8f" stroke-width="4"/>
+          <text x="16" y="26" fill="#536675">t = 1.24 s   alpha = 0.7 deg</text>
+        </svg>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. 独立动画窗口</h3>
+      <p>动画拥有更大的三维视野；原有结果图和测试基本不受影响。推荐。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="combined-window" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:18px;background:#f7fafc">
+      <div style="border:3px solid #40546d;border-radius:8px;background:white;padding:8px">
+        <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px">
+          <div style="height:170px;background:#eef3f7;border:1px solid #91a3b5;display:flex;align-items:center;justify-content:center;color:#294965;font-weight:700">3D 动画</div>
+          <div style="height:80px;background:#f6ead9;border:1px solid #cda56b"></div>
+          <div style="height:80px;background:#e5f0ed;border:1px solid #72a89f"></div>
+          <div style="height:80px;background:#f1e6e9;border:1px solid #ba7e8a"></div>
+          <div style="height:80px;background:#e7e8f3;border:1px solid #8588b0"></div>
+          <div style="height:80px;background:#edf0d9;border:1px solid #9fa965"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. 动画与曲线同窗</h3>
+      <p>信息集中，但三维区域偏小，需要重排现有五图并修改相关绘图测试。</p>
+    </div>
+  </div>
+</div>

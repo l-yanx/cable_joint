@@ -1,0 +1,35 @@
+function jacobian = calc_cable_jacobian( ...
+        fixedPoints, movingPoints, q, rotation)
+% 计算绳长速度雅各比矩阵。
+
+    alpha = q(1);
+    beta = q(2);
+    position = [0; 0; q(3)];
+
+    [~, ~, unitVector] = calc_cable_length( ...
+        fixedPoints, movingPoints, position, rotation);
+
+    rx = [1,          0,           0;
+          0, cos(alpha), -sin(alpha);
+          0, sin(alpha), cos(alpha)];
+
+    dRx = [0,           0,           0;
+           0, -sin(alpha), -cos(alpha);
+           0,  cos(alpha),-sin(alpha)];
+
+    ry = [ cos(beta), 0, sin(beta);
+                   0, 1,         0;
+          -sin(beta), 0, cos(beta)];
+
+    dRy = [-sin(beta), 0, cos(beta);
+                    0, 0,         0;
+           -cos(beta), 0, -sin(beta)];
+
+    dPointDAlpha = ry * dRx * movingPoints;
+    dPointDBeta = dRy * rx * movingPoints;
+
+    jacobian = zeros(3, 3);
+    jacobian(:, 1) = sum(unitVector .* dPointDAlpha, 1).';
+    jacobian(:, 2) = sum(unitVector .* dPointDBeta, 1).';
+    jacobian(:, 3) = unitVector(3, :).';
+end
