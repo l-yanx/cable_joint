@@ -11,11 +11,13 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
 
     methods (TestMethodSetup)
         function hideFigures(testCase)
+            existingFigures = findall(groot, Type="figure");
             originalVisibility = get(groot, "defaultFigureVisible");
             set(groot, "defaultFigureVisible", "off");
             testCase.addTeardown( ...
                 @() set(groot, "defaultFigureVisible", originalVisibility));
-            testCase.addTeardown(@() close("all", "force"));
+            testCase.addTeardown( ...
+                @() CableJointAnimationTest.closeNewFigures(existingFigures));
         end
     end
 
@@ -44,14 +46,15 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
             fixedPlatformSurfaces = findobj(fixedPlatform, Type="surface");
             actuator = findobj(figureHandle, Tag="CenterActuator");
 
-            testCase.verifyNumElements(axesHandle, 1);
-            testCase.verifyNumElements(fixedPlatform, 1);
-            testCase.verifyNumElements(actuator, 1);
+            testCase.assertNumElements(axesHandle, 1);
+            testCase.assertNumElements(fixedPlatform, 1);
+            testCase.assertNumElements(actuator, 1);
+            testCase.assertNumElements(fixedPlatformSurfaces, 3);
             testCase.verifyEqual(axesHandle.DataAspectRatio, [1, 1, 1]);
+            radialDistance = hypot(actuator.XData, actuator.YData);
             testCase.verifyEqual( ...
-                max(actuator.XData, [], "all"), 5, AbsTol=1e-10);
-            testCase.verifyEqual( ...
-                min(actuator.XData, [], "all"), -5, AbsTol=1e-10);
+                radialDistance, 5 * ones(size(radialDistance)), ...
+                AbsTol=1e-10);
             testCase.verifyEqual( ...
                 [min(arrayfun(@(surfaceHandle) ...
                     min(surfaceHandle.ZData, [], "all"), ...
@@ -64,6 +67,12 @@ classdef CableJointAnimationTest < matlab.unittest.TestCase
     end
 
     methods (Static, Access=private)
+        function closeNewFigures(existingFigures)
+            currentFigures = findall(groot, Type="figure");
+            newFigures = currentFigures(~ismember(currentFigures, existingFigures));
+            delete(newFigures(isgraphics(newFigures)));
+        end
+
         function [fixedPoints, movingPoints] = platformGeometry()
             fixedPoints = [ ...
                 160, -80, -80;
