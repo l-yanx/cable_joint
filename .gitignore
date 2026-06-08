@@ -1,1 +1,11 @@
 .worktrees/
+
+# MATLAB autosave files
+*.asv
+
+# Generated animation files
+*.mp4
+*.avi
+
+# Local Superpowers brainstorming state
+.superpowers/brainstorm/*/state/

@@ -20,9 +20,14 @@ movingPoints = platform_points(movingPlatformRadius);
 
 %% 运动参数输入
 q0Deg = [0; 0; 39];
-qfDeg = [1; -2; 40];
-duration = 2;
+qfDeg = [5; -3; 42];
+duration = 10;
 timeStep = 0.01;
+
+%% 静力学分析输入
+enableStaticAnalysis = true;
+targetLoad = [0; 0; 50];  % [Mx; My; Fz]，单位分别为 N*mm、N*mm、N
+preferredForce = [30; 30; 30; 20];  % [T1; T2; T3; Fa]，单位 N
 
 %% 轨迹与运动学计算
 [qTrajectory, qdotTrajectory, time] = generate_pose_trajectory(q0Deg, qfDeg, duration, timeStep);
@@ -49,10 +54,22 @@ end
 
 actuatorCommand = convert_to_actuator_cmd(cableLength, drumRadius);
 
+if enableStaticAnalysis
+    targetLoadTrajectory = repmat(targetLoad, 1, sampleCount);
+    staticResult = tension_analysis( ...
+        fixedPoints, movingPoints, qTrajectory, targetLoadTrajectory, ...
+        PreferredForce=preferredForce);
+end
+
 fprintf("最终绳长 / mm：\n");
 disp(cableLength(:, end));
 fprintf("最终卷筒角度 / deg：\n");
 disp(rad2deg(actuatorCommand(:, end)));
+if enableStaticAnalysis
+    fprintf("最终驱动力 [T1; T2; T3; Fa] / N：\n");
+    disp(staticResult.forceTrajectory(:, end));
+    fprintf("最终静力学平衡残差范数：%.4e\n", staticResult.residualNorm(end));
+end
 
 animate_cable_joint( ...
     time, qTrajectory, fixedPoints, movingPoints, ...
@@ -64,6 +81,10 @@ animate_cable_joint( ...
 
 plot_results(time, qTrajectory, cableLength, cableSpeed, ...
     actuatorCommand, jacobianCondition);
+
+if enableStaticAnalysis
+    plot_static_results(time, staticResult);
+end
 
 function points = platform_points(radius)
     % 返回圆周上均匀分布的三个连接点。
