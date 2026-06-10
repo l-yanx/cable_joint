@@ -43,6 +43,19 @@ result = analyze_workspace( ...
 fprintf("工作空间扫描点数：%d\n", sampleCount);
 fprintf("正运动学收敛点数：%d\n", nnz(result.forwardConverged));
 fprintf("最终可行点数：%d\n", nnz(result.isFeasible));
+
+if any(result.isFeasible)
+    feasiblePose = result.pose(:, result.isFeasible);
+    fprintf("可行姿态 alpha 范围 / deg：[%.3f, %.3f]\n", ...
+        min(rad2deg(feasiblePose(1, :))), max(rad2deg(feasiblePose(1, :))));
+    fprintf("可行姿态 beta 范围 / deg：[%.3f, %.3f]\n", ...
+        min(rad2deg(feasiblePose(2, :))), max(rad2deg(feasiblePose(2, :))));
+    fprintf("可行姿态 h 范围 / mm：[%.3f, %.3f]\n", ...
+        min(feasiblePose(3, :)), max(feasiblePose(3, :)));
+else
+    fprintf("没有可行姿态，无法计算姿态范围。\n");
+end
+
 plot_workspace_cloud(result);
 
 function points = platform_points(radius)
