@@ -1,6 +1,6 @@
 # 三自由度绳驱关节仿真
 
-MATLAB 工程，用于仿真三根绳索与中央直线执行器共同驱动的三自由度关节。工程包含姿态轨迹规划、绳长与绳速计算、卷筒指令转换、静力学张力分配、三维动画和结果绘图。
+MATLAB 工程，用于仿真三根绳索与中央直线执行器共同驱动的三自由度关节。工程包含姿态轨迹规划、绳长与绳速计算、卷筒指令转换、静力学张力分配、三维动画、结果绘图和正运动学工作空间分析。
 
 ## 模型约定
 
@@ -62,6 +62,37 @@ preferredForce = [30; 30; 30; 20]; % [T1; T2; T3; Fa] / N
 3. 绘制运动学结果；
 4. 在启用静力学分析时绘制张力、执行器力、平衡残差和可行性。
 
+### 工作空间分析
+
+运行独立的正运动学工作空间分析：
+
+```matlab
+workspace_analysis/workspace_run
+```
+
+脚本在卷筒角度和中央执行器行程范围内进行 Monte Carlo 采样，通过正运动学求解姿态，并保留同时满足以下条件的点：
+
+- 三个卷筒角度均在设定范围内；
+- 正运动学收敛且绳长残差满足容差；
+- 三根绳张力均大于设定下限；
+- 静力学平衡残差满足容差。
+
+运行结束后，命令行输出扫描点数、收敛点数、可行点数，以及可行姿态的 `alpha`、`beta`、`h` 范围；点云图使用颜色表示最小绳张力。默认采样 `100000` 点，当前环境通常耗时约 2–3 分钟。
+
+主要参数集中在 `workspace_analysis/workspace_run.m`：
+
+```matlab
+actuatorAngleLimitDeg = [-135, 135];
+linearActuatorRange = [50, 150];
+sampleCount = 100000;
+randomSeed = 0;
+
+referencePoseDeg = [0; 0; 100];
+poseAngleLimitDeg = [-90, 90];
+targetLoad = [0; 0; 50];
+preferredForce = [30; 30; 30; 20];
+```
+
 ## 计算流程
 
 ```text
@@ -114,6 +145,15 @@ theta = (cableLength - cableLength(:, 1)) / drumRadius;
 | `solve_tension_distribution.m` | 用伪逆和零空间将解投影到 `PreferredForce` 附近，并检查平衡残差与绳索受拉条件 |
 | `tension_analysis.m` | 沿整条姿态轨迹逐点计算静力学矩阵、驱动力、残差和可行性 |
 
+### 工作空间分析
+
+| 文件 | 内容 |
+| --- | --- |
+| `workspace_analysis/workspace_run.m` | 独立入口；定义采样、执行器、正运动学和静力学参数 |
+| `workspace_analysis/analyze_workspace.m` | 采样执行器输入并完成正运动学、执行器范围和张力可行性筛选 |
+| `workspace_analysis/solve_forward_kinematics.m` | 使用多初值阻尼 Newton 方法求解单个执行器输入对应的姿态 |
+| `workspace_analysis/plot_workspace_cloud.m` | 绘制 `alpha-beta-h` 可行工作空间点云 |
+
 ### 测试与资料
 
 | 路径 | 内容 |
@@ -121,8 +161,9 @@ theta = (cableLength - cableLength(:, 1)) / drumRadius;
 | `tests/CableJointKinematicsTest.m` | 绳长、Jacobian、轨迹、卷筒转换和运动学绘图测试 |
 | `tests/CableJointStaticAnalysisTest.m` | 静力学矩阵、驱动力分配、轨迹分析和绘图测试 |
 | `tests/CableJointAnimationTest.m` | 动画几何、位姿更新、播放时序、输入校验和视频导出测试 |
+| `workspace_analysis/tests/WorkspaceAnalysisTest.m` | 正运动学、采样复现、可行性筛选和工作空间绘图测试 |
 | `reference/` | 理论架构说明、论文 PDF 和原始 CAJ 文献 |
-| `docs/superpowers/` | 动画功能的设计记录与实施计划，不参与运行 |
+| `docs/superpowers/` | 功能设计记录与实施计划，不参与运行 |
 
 ## 静力学说明
 
@@ -154,5 +195,7 @@ videoFile = "cable_joint_motion.mp4";
 
 - 平台连接点固定为圆周上均匀分布的三个点，定义在 `main_run.m` 的局部函数 `platform_points` 中；
 - 轨迹只支持两个转角和一个轴向位移；
+- 工作空间点云基于 Monte Carlo 采样，不保证严格命中工作空间边界；
+- 正运动学只保留姿态角范围内收敛到的一个连续解分支；
 - 未建模绳索弹性、摩擦、质量、惯性和动力学；
 - `Jacobian` 条件数仅用于数值状态观察，程序不会自动避开奇异位姿。
