@@ -7,27 +7,27 @@ clc;
 close all;
 
 %% 机构参数
-fixedPlatformRadius = 160;
-movingPlatformRadius = 80;
-drumRadius = 15;
+fixedPlatformRadius = 93;
+movingPlatformRadius = 64.5;
+drumRadius = 22.5;
 platformThickness = 1;
 actuatorRadius = 5;
-exportVideo = false;
+exportVideo = true;
 videoFile = "cable_joint_motion.mp4";
 
 fixedPoints = platform_points(fixedPlatformRadius);
 movingPoints = platform_points(movingPlatformRadius);
 
 %% 运动参数输入
-q0Deg = [0; 0; 39];
-qfDeg = [5; -3; 42];
+q0Deg = [0; 0; 151];
+qfDeg = [5; -3; 155];
 duration = 10;
 timeStep = 0.01;
 
 %% 静力学分析输入
 enableStaticAnalysis = true;
-targetLoad = [0; 0; 50];  % [Mx; My; Fz]，单位分别为 N*mm、N*mm、N
-preferredForce = [30; 30; 30; 20];  % [T1; T2; T3; Fa]，单位 N
+targetLoad = [0; 0; 1.2];  % [Mx; My; Fz]，单位分别为 N*mm、N*mm、N
+preferredForce = [1; 1; 1; 1];  % [T1; T2; T3; Fa]，单位 N
 
 %% 轨迹与运动学计算
 [qTrajectory, qdotTrajectory, time] = generate_pose_trajectory(q0Deg, qfDeg, duration, timeStep);

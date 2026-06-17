@@ -7,25 +7,25 @@ scriptFolder = fileparts(mfilename("fullpath"));
 projectRoot = fileparts(scriptFolder);
 addpath(projectRoot, scriptFolder);
 
-fixedPlatformRadius = 160;
-movingPlatformRadius = 80;
-drumRadius = 15;
+fixedPlatformRadius = 93;
+movingPlatformRadius = 64.5;
+drumRadius = 22.5;
 fixedPoints = platform_points(fixedPlatformRadius);
 movingPoints = platform_points(movingPlatformRadius);
 
 actuatorAngleLimitDeg = [-135, 135];
-linearActuatorRange = [50, 150];
+linearActuatorRange = [150, 160];
 sampleCount = 100000;
 randomSeed = 0;
 
-referencePoseDeg = [0; 0; 100];
+referencePoseDeg = [0; 0; 151];
 poseAngleLimitDeg = [-90, 90];
 initialGuessDeg = [0, 30, -30, 0, 0; 0, 0, 0, 30, -30];
 forwardTolerance = 1e-6;
 maxIterations = 30;
 
-targetLoad = [0; 0; 50];
-preferredForce = [30; 30; 30; 20];
+targetLoad = [0; 0; 1.2];
+preferredForce = [1; 1; 1; 20];
 minCableTension = 0;
 staticResidualTolerance = 1e-8;
 

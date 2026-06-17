@@ -7,7 +7,7 @@ function result = analyze_workspace( ...
         movingPoints
         drumRadius
         options.ActuatorAngleLimitDeg = [-135, 135]
-        options.LinearActuatorRange = [50, 150]
+        options.LinearActuatorRange = [150, 160]
         options.SampleCount = 100000
         options.RandomSeed = 0
         options.ReferencePoseDeg = [0; 0; 100]
@@ -15,8 +15,8 @@ function result = analyze_workspace( ...
         options.InitialGuessDeg = [0, 30, -30, 0, 0; 0, 0, 0, 30, -30]
         options.ForwardTolerance = 1e-6
         options.MaxIterations = 30
-        options.TargetLoad = [0; 0; 50]
-        options.PreferredForce = [30; 30; 30; 20]
+        options.TargetLoad = [0; 0; 1.2]
+        options.PreferredForce = [1; 1; 1; 20]
         options.MinCableTension = 0
         options.StaticResidualTolerance = 1e-8
     end
